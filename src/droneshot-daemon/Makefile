@@ -15,11 +15,15 @@ SOURCES = droneshot-daemon.cpp \
 
 # phony rules
 
+ifeq ($(PLATFORM),emulation)
+all: emulation
+else
 all: rpi
+endif
 
 clean:
-	-rm $(OUTPUT)
-	-find . -name '*.o' -delete
+	-@rm $(OUTPUT)
+	-@find . -name '*.o' -delete
 
 emulation: CPPFLAGS += -DDS_HW_EMULATION
 emulation: $(OUTPUT)
@@ -29,7 +33,7 @@ rpi: $(OUTPUT)
 
 # file rules
 
-ifeq ($(MAKECMDGOALS),emulation)
+ifeq ($(PLATFORM),emulation)
 $(OUTPUT): $(SOURCES:.cpp=.o) \
            hardware/emulation/hardware_interface.o
 else
