@@ -12,10 +12,10 @@ public:
 
 	hardware_interface & operator=(hardware_interface const &) = delete;
 
-	static hardware_interface instance;
-
 private:
 	hardware_interface();
+
+	static hardware_interface instance;
 };
 
 }
