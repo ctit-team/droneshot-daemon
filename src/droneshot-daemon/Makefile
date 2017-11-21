@@ -9,7 +9,9 @@ LDLIBS = -lstdc++
 # sources
 
 SOURCES = droneshot-daemon.cpp \
-          hardware/hardware_interface.cpp
+          exception/formatter.cpp \
+          hardware/hardware_interface.cpp \
+          rpc/rpc_server.cpp
 
 # phony rules
 
