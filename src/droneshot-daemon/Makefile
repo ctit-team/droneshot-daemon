@@ -1,12 +1,36 @@
-.PHONY: all clean
+.PHONY: all clean emulation rpi
+
+# common variables
 
 OUTPUT = droneshot-daemon
-CXXFLAGS =
-SOURCE = droneshot-daemon.cpp
+CPPFLAGS =
+LDLIBS = -lstdc++
 
-all: $(OUTPUT)
+# sources
+
+SOURCES = droneshot-daemon.cpp \
+          hardware/hardware_interface.cpp
+
+# phony rules
+
+all: rpi
 
 clean:
-	rm $(OUTPUT) *.o
+	-rm $(OUTPUT)
+	-find . -name '*.o' -delete
 
-$(OUTPUT): $(SOURCE:.cpp=.o)
+emulation: CPPFLAGS += -DDS_HW_EMULATION
+emulation: $(OUTPUT)
+
+rpi: LDLIBS += -lbcm2835
+rpi: $(OUTPUT)
+
+# file rules
+
+ifeq ($(MAKECMDGOALS),emulation)
+$(OUTPUT): $(SOURCES:.cpp=.o) \
+           hardware/emulation/hardware_interface.o
+else
+$(OUTPUT): $(SOURCES:.cpp=.o) \
+           hardware/rpi/hardware_interface.o
+endif
