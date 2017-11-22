@@ -1,0 +1,3 @@
+[submodule "droneshot-api"]
+	path = src/droneshot-api
+	url = https://github.com/ctit-team/droneshot-api.git

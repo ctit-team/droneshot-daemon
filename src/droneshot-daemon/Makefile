@@ -22,8 +22,8 @@ all: rpi
 endif
 
 clean:
-	-@rm $(OUTPUT)
-	-@find . -name '*.o' -delete
+	rm -f $(OUTPUT)
+	find . -name '*.o' -delete
 
 emulation: CPPFLAGS += -DDS_HW_EMULATION
 emulation: $(OUTPUT)

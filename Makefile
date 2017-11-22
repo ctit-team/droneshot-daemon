@@ -6,7 +6,7 @@ all: bin
 
 clean:
 	$(MAKE) -C src clean
-	-@rm bin/*
+	rm -f bin/*
 
 bin:
 	mkdir bin
