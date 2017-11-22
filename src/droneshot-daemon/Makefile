@@ -3,8 +3,9 @@
 # common variables
 
 OUTPUT = droneshot-daemon
-CPPFLAGS =
-LDLIBS = -lstdc++
+CPPFLAGS = -I../droneshot-api/include
+LDFLAGS = -L../droneshot-api/lib
+LDLIBS = -lstdc++ -ldroneshot-api
 
 # sources
 

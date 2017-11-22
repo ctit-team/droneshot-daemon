@@ -12,15 +12,12 @@ public:
 	rpc_server & operator=(rpc_server && src);
 	rpc_server & operator=(rpc_server const &) = delete;
 
-	bool is_running() const { return fd != -1; }
+	bool is_running() const;
 
 	void start();
 	void stop();
 
 private:
-	void create_socket();
-	void close_socket();
-
 	int fd;
 };
 
