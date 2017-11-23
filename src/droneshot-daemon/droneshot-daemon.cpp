@@ -5,25 +5,12 @@
 #include <exception>
 #include <iostream>
 
-static rpc::rpc_server start_rpc_server()
-{
-	rpc::rpc_server s;
-
-	try {
-		s.start();
-	} catch (...) {
-		std::throw_with_nested(std::runtime_error("Failed to start RPC server."));
-	}
-
-	return s;
-}
-
 static void run()
 {
 	rpc::rpc_server serv;
 
 	try {
-		serv = start_rpc_server();
+		serv.start();
 	} catch (...) {
 		std::throw_with_nested(std::runtime_error("Failed to start RPC server."));
 	}

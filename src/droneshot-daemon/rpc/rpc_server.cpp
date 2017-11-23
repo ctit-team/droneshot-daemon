@@ -9,6 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <system_error>
+#include <utility>
 
 #include <unistd.h>
 #include <sys/socket.h>
@@ -18,15 +19,13 @@
 
 namespace rpc {
 
-rpc_server::rpc_server() :
-	fd(-1)
+rpc_server::rpc_server()
 {
 }
 
 rpc_server::rpc_server(rpc_server && src) :
-	fd(src.fd)
+	fd(std::move(src.fd))
 {
-	src.fd = -1;
 }
 
 rpc_server::~rpc_server()
@@ -40,17 +39,9 @@ rpc_server::~rpc_server()
 	}
 }
 
-rpc_server & rpc_server::operator=(rpc_server && src)
-{
-	fd = src.fd;
-	src.fd = -1;
-
-	return *this;
-}
-
 bool rpc_server::is_running() const
 {
-	return fd != -1 || access(droneshot::api::socket_path.c_str(), F_OK) == 0;
+	return fd || access(droneshot::api::socket_path.c_str(), F_OK) == 0;
 }
 
 void rpc_server::start()
@@ -61,13 +52,14 @@ void rpc_server::start()
 	}
 
 	// create socket.
-	int fd;
+	droneshot::os::file_descriptor fd;
 
 	try {
-		fd = socket(AF_UNIX, SOCK_STREAM, 0);
-		if (fd == -1) {
+		auto res = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (res == -1) {
 			throw std::system_error(errno, std::system_category());
 		}
+		fd.reset(res);
 	} catch (...) {
 		std::throw_with_nested(std::runtime_error("Failed to create server socket"));
 	}
@@ -79,16 +71,10 @@ void rpc_server::start()
 		addr.sun_family = AF_UNIX;
 		std::strcpy(addr.sun_path, droneshot::api::socket_path.c_str());
 
-		if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1) {
+		if (bind(fd.get(), reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) == -1) {
 			throw std::system_error(errno, std::system_category());
 		}
 	} catch (...) {
-		if (close(fd) == -1) {
-			auto err = errno;
-			std::cerr << "Failed to clean up socket #" << fd << ": "
-					  << std::system_category().message(err) << std::endl;
-		}
-
 		std::throw_with_nested(std::runtime_error("Failed to bind socket to local address"));
 	}
 
@@ -98,12 +84,6 @@ void rpc_server::start()
 			throw std::system_error(errno, std::system_category());
 		}
 	} catch (...) {
-		if (close(fd) == -1) {
-			auto err = errno;
-			std::cerr << "Failed to clean up socket #" << fd << ": "
-					  << std::system_category().message(err) << std::endl;
-		}
-
 		if (unlink(droneshot::api::socket_path.c_str()) == -1) {
 			auto err = errno;
 			std::cerr << "Failed to remove " << droneshot::api::socket_path << ": "
@@ -113,7 +93,7 @@ void rpc_server::start()
 		std::throw_with_nested(std::runtime_error("Failed to allow world writable to server socket"));
 	}
 
-	this->fd = fd;
+	this->fd = std::move(fd);
 }
 
 void rpc_server::stop()
@@ -123,15 +103,12 @@ void rpc_server::stop()
 	}
 
 	// close socket
-	if (fd != -1) {
+	if (fd) {
 		try {
-			if (close(fd) == -1) {
-				throw std::system_error(errno, std::system_category());
-			}
+			fd.close();
 		} catch (...) {
 			std::throw_with_nested(std::runtime_error("Failed to close server socket"));
 		}
-		fd = -1;
 	}
 
 	// remove socket
