@@ -2,5 +2,5 @@
 
 #include <stdbool.h>
 
-bool rpc_server_start();
-void rpc_server_stop();
+int rpc_server_start(void);
+void rpc_server_stop(int fd);

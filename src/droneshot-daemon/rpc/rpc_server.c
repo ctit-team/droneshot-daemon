@@ -11,9 +11,26 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
-static int server_fd = -1;
+static bool listen_connections(int fd)
+{
+	// change socket permission to world writable.
+	if (chmod(DRONESHOT_SOCKET_NAME, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
+		const char *reason = strerror(errno);
+		fprintf(stderr, "Failed to allow world writable to %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
+		return false;
+	}
 
-static bool setup_server_socket(int fd)
+	// listen for connections
+	if (listen(fd, 5) == -1) {
+		const char *reason = strerror(errno);
+		fprintf(stderr, "Failed to listen for connection: %s.\n", reason);
+		return false;
+	}
+
+	return true;
+}
+
+static bool start_server(int fd)
 {
 	struct sockaddr_un addr;
 
@@ -29,69 +46,49 @@ static bool setup_server_socket(int fd)
 		return false;
 	}
 
-	// change socket permission to world writable.
-	if (chmod(DRONESHOT_SOCKET_NAME, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
-		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to allow world writable to %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
-
+	if (!listen_connections(fd)) {
 		if (unlink(DRONESHOT_SOCKET_NAME) == -1) {
 			const char *reason = strerror(errno);
 			fprintf(stderr, "Failed to remove %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
 		}
-
 		return false;
 	}
 
 	return true;
 }
 
-bool rpc_server_start()
+int rpc_server_start(void)
 {
 	int fd;
-
-	// check if we already running.
-	if (server_fd != -1) {
-		fprintf(stderr, "Failed to start RPC server: Server is already running.\n");
-		return false;
-	}
 
 	// create socket.
 	fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 	if (fd == -1) {
 		const char *reason = strerror(errno);
 		fprintf(stderr, "Failed to create server socket: %s.\n", reason);
-		return false;
+		return -1;
 	}
 
-	if (!setup_server_socket(fd)) {
+	if (!start_server(fd)) {
 		if (close(fd) == -1) {
 			const char *reason = strerror(errno);
 			fprintf(stderr, "Failed to clean up file descriptor #%d: %s.\n", fd, reason);
 		}
-		return false;
+		return -1;
 	}
 
-	server_fd = fd;
-
-	return true;
+	return fd;
 }
 
-void rpc_server_stop()
+void rpc_server_stop(int fd)
 {
-	if (server_fd == -1) {
-		fprintf(stderr, "Failed to stop RPC server: Server is not running.\n");
-		return;
-	}
-
 	// close socket
-	if (close(server_fd) == -1) {
+	if (close(fd) == -1) {
 		// we still can remove socket from file system, so don't return when we
 		// fail to close socket.
 		const char *reason = strerror(errno);
 		fprintf(stderr, "Failed to close server socket: %s.\n", reason);
 	}
-
-	server_fd = -1;
 
 	// remove socket
 	if (unlink(DRONESHOT_SOCKET_NAME) == -1) {
