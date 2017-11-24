@@ -9,10 +9,8 @@ LDLIBS = -lstdc++ -ldroneshot-api -ldroneshot-lib
 
 # sources
 
-SOURCES = droneshot-daemon.cpp \
-          exception/formatter.cpp \
-          hardware/hardware_interface.cpp \
-          rpc/rpc_server.cpp
+SOURCES = droneshot-daemon.c \
+          rpc/rpc_server.c
 
 # phony rules
 
@@ -35,9 +33,11 @@ rpi: $(OUTPUT)
 # file rules
 
 ifeq ($(PLATFORM),emulation)
-$(OUTPUT): $(SOURCES:.cpp=.o) \
+$(OUTPUT): $(SOURCES:.c=.o) \
+           hardware/hardware_interface.o \
            hardware/emulation/hardware_interface.o
 else
-$(OUTPUT): $(SOURCES:.cpp=.o) \
+$(OUTPUT): $(SOURCES:.c=.o) \
+           hardware/hardware_interface.o \
            hardware/rpi/hardware_interface.o
 endif
