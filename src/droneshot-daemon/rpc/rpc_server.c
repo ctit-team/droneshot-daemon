@@ -1,7 +1,5 @@
 #include "rpc_server.h"
 
-#include <droneshot-api/socket.h>
-
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,12 +9,14 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
+#define SOCKET_NAME "/tmp/droneshot"
+
 static bool listen_connections(int fd)
 {
 	// change socket permission to world writable.
-	if (chmod(DRONESHOT_SOCKET_NAME, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
+	if (chmod(SOCKET_NAME, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
 		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to allow world writable to %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
+		fprintf(stderr, "Failed to allow world writable to %s: %s.\n", SOCKET_NAME, reason);
 		return false;
 	}
 
@@ -38,18 +38,18 @@ static bool start_server(int fd)
 	memset(&addr, 0, sizeof(addr));
 
 	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, DRONESHOT_SOCKET_NAME);
+	strcpy(addr.sun_path, SOCKET_NAME);
 
 	if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
 		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to bind server socket to %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
+		fprintf(stderr, "Failed to bind server socket to %s: %s.\n", SOCKET_NAME, reason);
 		return false;
 	}
 
 	if (!listen_connections(fd)) {
-		if (unlink(DRONESHOT_SOCKET_NAME) == -1) {
+		if (unlink(SOCKET_NAME) == -1) {
 			const char *reason = strerror(errno);
-			fprintf(stderr, "Failed to remove %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
+			fprintf(stderr, "Failed to remove %s: %s.\n", SOCKET_NAME, reason);
 		}
 		return false;
 	}
@@ -80,6 +80,18 @@ int rpc_server_start(void)
 	return fd;
 }
 
+int rpc_server_accept(int fd)
+{
+	fd = accept(fd, NULL, 0);
+	if (fd == -1) {
+		const char *reason = strerror(errno);
+		fprintf(stderr, "Failed to accept a connection from RPC client: %s.\n", reason);
+		return -1;
+	}
+
+	return fd;
+}
+
 void rpc_server_stop(int fd)
 {
 	// close socket
@@ -91,8 +103,8 @@ void rpc_server_stop(int fd)
 	}
 
 	// remove socket
-	if (unlink(DRONESHOT_SOCKET_NAME) == -1) {
+	if (unlink(SOCKET_NAME) == -1) {
 		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to remove %s: %s.\n", DRONESHOT_SOCKET_NAME, reason);
+		fprintf(stderr, "Failed to remove %s: %s.\n", SOCKET_NAME, reason);
 	}
 }

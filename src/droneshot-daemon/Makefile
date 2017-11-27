@@ -3,13 +3,14 @@
 # common variables
 
 OUTPUT = droneshot-daemon
-CPPFLAGS = -I../droneshot-api/include -I../droneshot-lib/include
-LDFLAGS = -L../droneshot-api/lib -L../droneshot-lib/lib
-LDLIBS = -lstdc++ -ldroneshot-api -ldroneshot-lib
+CPPFLAGS = -I../droneshot-lib/include
+LDFLAGS = -L../droneshot-lib/lib
+LDLIBS = -lstdc++ -ldroneshot-lib
 
 # sources
 
 SOURCES = droneshot-daemon.c \
+          rpc/rpc_client.c \
           rpc/rpc_server.c
 
 # phony rules
