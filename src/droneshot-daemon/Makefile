@@ -3,9 +3,9 @@
 # common variables
 
 OUTPUT = droneshot-daemon
-CPPFLAGS = -I../droneshot-lib/include
-LDFLAGS = -L../droneshot-lib/lib
-LDLIBS = -lstdc++ -ldroneshot-lib
+CPPFLAGS =
+LDFLAGS =
+LDLIBS = -lstdc++
 
 # sources
 
@@ -25,7 +25,7 @@ clean:
 	rm -f $(OUTPUT)
 	find . -name '*.o' -delete
 
-emulation: CPPFLAGS += -DDS_HW_EMULATION
+emulation: CPPFLAGS += -DDRONESHOT_HW_EMULATION
 emulation: $(OUTPUT)
 
 rpi: LDLIBS += -lbcm2835
@@ -35,10 +35,8 @@ rpi: $(OUTPUT)
 
 ifeq ($(PLATFORM),emulation)
 $(OUTPUT): $(SOURCES:.c=.o) \
-           hardware/hardware_interface.o \
-           hardware/emulation/hardware_interface.o
+           hardware/emulation/interface.o
 else
 $(OUTPUT): $(SOURCES:.c=.o) \
-           hardware/hardware_interface.o \
-           hardware/rpi/hardware_interface.o
+           hardware/rpi/interface.o
 endif

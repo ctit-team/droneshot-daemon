@@ -1,3 +1,4 @@
+#include "hardware/interface.h"
 #include "rpc/rpc_client.h"
 #include "rpc/rpc_server.h"
 
@@ -124,21 +125,32 @@ static bool run_rpc_server(int server_fd)
 	return true;
 }
 
+static bool start_rpc_server(void)
+{
+	bool res;
+	int server_fd;
+
+	server_fd = rpc_server_start();
+	if (server_fd == -1) {
+		return false;
+	}
+
+	res = run_rpc_server(server_fd);
+	rpc_server_stop(server_fd);
+
+	return res;
+}
+
 int main(int argc, char *argv[])
 {
 	int res;
-	int server_fd;
 
-	// start RPC server.
-	server_fd = rpc_server_start();
-	if (server_fd == -1) {
+	if (!hardware_interface_init()) {
 		return EXIT_FAILURE;
 	}
 
-	res = run_rpc_server(server_fd) ? EXIT_SUCCESS : EXIT_FAILURE;
-
-	// clean up.
-	rpc_server_stop(server_fd);
+	res = start_rpc_server() ? EXIT_SUCCESS : EXIT_FAILURE;
+	hardware_interface_close();
 
 	return res;
 }
