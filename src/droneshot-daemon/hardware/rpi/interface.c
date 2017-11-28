@@ -6,50 +6,78 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CTRLPIN_WIFI1	RPI_V2_GPIO_P1_11
-#define CTRLPIN_WIFI2	RPI_V2_GPIO_P1_13
-#define CTRLPIN_WIFI3	RPI_V2_GPIO_P1_15
-#define CTRLPIN_GPS		RPI_V2_GPIO_P1_33
-#define CTRLPIN_RC1		RPI_V2_GPIO_P1_35
-#define CTRLPIN_RC2		RPI_V2_GPIO_P1_37
+#define CTRLPIN_WIFI1	RPI_V2_GPIO_P1_03
+#define CTRLPIN_WIFI2	RPI_V2_GPIO_P1_05
+#define CTRLPIN_WIFI3	RPI_V2_GPIO_P1_07
+#define CTRLPIN_GPS		RPI_V2_GPIO_P1_22
+#define CTRLPIN_RC1		RPI_V2_GPIO_P1_29
+#define CTRLPIN_RC2		RPI_V2_GPIO_P1_31
+
+#define PWRPIN_WIFI1	RPI_V2_GPIO_P1_40
+#define PWRPIN_WIFI2	RPI_V2_GPIO_P1_38
+#define PWRPIN_WIFI3	RPI_V2_GPIO_P1_36
+#define PWRPIN_GPS		RPI_V2_GPIO_P1_37
+#define PWRPIN_RC1		RPI_V2_GPIO_P1_35
+#define PWRPIN_RC2		RPI_V2_GPIO_P1_33
+
+#define CTRLPIN_MASK	((1 << CTRLPIN_WIFI1) | \
+						 (1 << CTRLPIN_WIFI2) | \
+						 (1 << CTRLPIN_WIFI3) | \
+						 (1 << CTRLPIN_GPS) | \
+						 (1 << CTRLPIN_RC1) | \
+						 (1 << CTRLPIN_RC2))
+
+#define PWRPIN_MASK		((1 << PWRPIN_WIFI1) | \
+						 (1 << PWRPIN_WIFI2) | \
+						 (1 << PWRPIN_WIFI3) | \
+						 (1 << PWRPIN_GPS) | \
+						 (1 << PWRPIN_RC1) | \
+						 (1 << PWRPIN_RC2))
 
 struct transmitter {
 	uint8_t downpin;
 };
 
-static void initialize_pin(uint8_t pin)
-{
-	bcm2835_gpio_fsel(pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_set(pin);
-}
-
 bool hardware_interface_init(void)
 {
+	uint32_t pins, states;
+
 	// initialize library.
 	if (!bcm2835_init()) {
 		return false;
 	}
 
-	// set all selector pin to high.
-	initialize_pin(CTRLPIN_WIFI1);
-	initialize_pin(CTRLPIN_WIFI2);
-	initialize_pin(CTRLPIN_WIFI3);
-	initialize_pin(CTRLPIN_GPS);
-	initialize_pin(CTRLPIN_RC1);
-	initialize_pin(CTRLPIN_RC2);
+	// set all control/power pins to output mode.
+	bcm2835_gpio_fsel(CTRLPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(CTRLPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(CTRLPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(CTRLPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(CTRLPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(CTRLPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
+
+	bcm2835_gpio_fsel(PWRPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PWRPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PWRPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PWRPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PWRPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PWRPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
+
+	// initialize pins state.
+	pins = 0; states = 0;
+
+	pins   |= CTRLPIN_MASK | PWRPIN_MASK;
+	states |= CTRLPIN_MASK; // set all control pins and clear all power pins.
+
+	bcm2835_gpio_write_mask(states, pins);
 
 	return true;
 }
 
 void hardware_interface_close(void)
 {
-	// set all selector pin to low.
-	bcm2835_gpio_clr(CTRLPIN_WIFI1);
-	bcm2835_gpio_clr(CTRLPIN_WIFI2);
-	bcm2835_gpio_clr(CTRLPIN_WIFI3);
-	bcm2835_gpio_clr(CTRLPIN_GPS);
-	bcm2835_gpio_clr(CTRLPIN_RC1);
-	bcm2835_gpio_clr(CTRLPIN_RC2);
+	// reset all pins.
+	bcm2835_gpio_clr_multi(PWRPIN_MASK); // turn off first.
+	bcm2835_gpio_clr_multi(CTRLPIN_MASK);
 
 	// clean up library.
 	if (!bcm2835_close()) {
