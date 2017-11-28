@@ -10,6 +10,8 @@ LDLIBS = -lstdc++
 # sources
 
 SOURCES = droneshot-daemon.c \
+          hardware/interface.c \
+          hardware/transmitter_collection.c \
           rpc/rpc_client.c \
           rpc/rpc_server.c
 

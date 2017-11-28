@@ -1,4 +1,5 @@
 #include "hardware/interface.h"
+#include "hardware/transmitter_collection.h"
 #include "rpc/rpc_client.h"
 #include "rpc/rpc_server.h"
 
@@ -141,16 +142,36 @@ static bool start_rpc_server(void)
 	return res;
 }
 
-int main(int argc, char *argv[])
+static bool init_hardware(void)
 {
-	int res;
+	if (hardware_interface_init()) {
+		if (transmitter_collection_init()) {
+			return true;
+		}
 
-	if (!hardware_interface_init()) {
-		return EXIT_FAILURE;
+		hardware_interface_close();
 	}
 
-	res = start_rpc_server() ? EXIT_SUCCESS : EXIT_FAILURE;
+	return false;
+}
+
+static void close_hardware()
+{
+	transmitter_collection_close();
 	hardware_interface_close();
+}
+
+int main(int argc, char *argv[])
+{
+	int res = EXIT_FAILURE;
+
+	if (init_hardware()) {
+		if (start_rpc_server()) {
+			res = EXIT_SUCCESS;
+		}
+
+		close_hardware();
+	}
 
 	return res;
 }
