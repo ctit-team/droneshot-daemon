@@ -16,7 +16,7 @@ void hardware_interface_close(void)
 {
 }
 
-struct transmitter * hardware_interface_transmitter_open(int id)
+struct transmitter * transmitter_open(int id)
 {
 	struct transmitter *t;
 
@@ -39,7 +39,7 @@ struct transmitter * hardware_interface_transmitter_open(int id)
 	return t;
 }
 
-void hardware_interface_transmitter_close(struct transmitter *t)
+void transmitter_close(struct transmitter *t)
 {
 	free(t);
 }

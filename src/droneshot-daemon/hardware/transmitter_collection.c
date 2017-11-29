@@ -37,10 +37,10 @@ bool transmitter_collection_init(void)
 			continue;
 		}
 
-		t = hardware_interface_transmitter_open(desc->id);
+		t = transmitter_open(desc->id);
 		if (!t) {
 			for (i--; i >= 0; i--) {
-				hardware_interface_transmitter_close(*desc->interface);
+				transmitter_close(*desc->interface);
 				*desc->interface = NULL;
 			}
 			return false;
@@ -60,7 +60,7 @@ void transmitter_collection_close(void)
 		const struct transmitter_descriptor *desc = &descriptors[i];
 
 		if (*desc->interface) {
-			hardware_interface_transmitter_close(*desc->interface);
+			transmitter_close(*desc->interface);
 			*desc->interface = NULL;
 		}
 	}

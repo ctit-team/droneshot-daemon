@@ -16,5 +16,5 @@ extern const char *transmitter_names[];
 bool hardware_interface_init(void);
 void hardware_interface_close(void);
 
-struct transmitter * hardware_interface_transmitter_open(int id);
-void hardware_interface_transmitter_close(struct transmitter *t);
+struct transmitter * transmitter_open(int id);
+void transmitter_close(struct transmitter *t);
