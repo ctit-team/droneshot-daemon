@@ -3,7 +3,7 @@
 # common variables
 
 OUTPUT = droneshot-daemon
-CPPFLAGS =
+CPPFLAGS = -Wall
 LDFLAGS =
 LDLIBS = -lstdc++
 

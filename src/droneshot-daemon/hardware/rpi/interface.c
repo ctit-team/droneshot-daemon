@@ -3,8 +3,11 @@
 #include <bcm2835.h>
 
 #include <inttypes.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define SOCLIB "C library for Broadcom BCM 2835"
 
 #define CTRLPIN_WIFI1	RPI_V2_GPIO_P1_03
 #define CTRLPIN_WIFI2	RPI_V2_GPIO_P1_05
@@ -35,53 +38,73 @@
 						 (1 << PWRPIN_RC2))
 
 struct transmitter {
-	uint8_t downpin;
+	uint8_t ctrlpin;
 };
 
 bool hardware_interface_init(void)
 {
-	uint32_t pins, states;
+	if (bcm2835_init()) {
+		if (bcm2835_spi_begin()) {
+			uint32_t pins, states;
 
-	// initialize library.
-	if (!bcm2835_init()) {
-		return false;
+			// disable SPI automatic chip selector since we control it manually.
+			bcm2835_spi_chipSelect(BCM2835_SPI_CS_NONE);
+
+			// adjust SPI options. see MCP41050 data sheet for more information.
+			bcm2835_spi_setBitOrder(BCM2835_SPI_BIT_ORDER_MSBFIRST);
+			bcm2835_spi_setClockDivider(BCM2835_SPI_CLOCK_DIVIDER_128); // 3.125MHz on RPI3.
+			bcm2835_spi_setDataMode(BCM2835_SPI_MODE0);
+
+			// set all control/power pins to output mode.
+			bcm2835_gpio_fsel(CTRLPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(CTRLPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(CTRLPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(CTRLPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(CTRLPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(CTRLPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
+
+			bcm2835_gpio_fsel(PWRPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(PWRPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(PWRPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(PWRPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(PWRPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
+			bcm2835_gpio_fsel(PWRPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
+
+			// initialize pins state.
+			pins = 0; states = 0;
+
+			pins   |= CTRLPIN_MASK | PWRPIN_MASK;
+			states |= CTRLPIN_MASK; // set all control pins and clear all power pins.
+
+			bcm2835_gpio_write_mask(states, pins);
+
+			return true;
+		}
+
+		fprintf(stderr, "Failed to initializes SPI interface.\n");
+
+		if (!bcm2835_close()) {
+			fprintf(stderr, "Failed to clean up " SOCLIB ".\n");
+		}
 	}
 
-	// set all control/power pins to output mode.
-	bcm2835_gpio_fsel(CTRLPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(CTRLPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(CTRLPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(CTRLPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(CTRLPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(CTRLPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
-
-	bcm2835_gpio_fsel(PWRPIN_WIFI1, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PWRPIN_WIFI2, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PWRPIN_WIFI3, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PWRPIN_GPS, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PWRPIN_RC1, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PWRPIN_RC2, BCM2835_GPIO_FSEL_OUTP);
-
-	// initialize pins state.
-	pins = 0; states = 0;
-
-	pins   |= CTRLPIN_MASK | PWRPIN_MASK;
-	states |= CTRLPIN_MASK; // set all control pins and clear all power pins.
-
-	bcm2835_gpio_write_mask(states, pins);
-
-	return true;
+	return false;
 }
 
 void hardware_interface_close(void)
 {
-	// reset all pins.
-	bcm2835_gpio_clr_multi(PWRPIN_MASK); // turn off first.
+	// turn off transmitters first to prevent unexpected behavior when clearing control pins.
+	bcm2835_gpio_clr_multi(PWRPIN_MASK);
+
+	// we need to shutdown SPI while control pins are high to prevent executing unexpected command.
+	bcm2835_spi_end();
+
+	// now it safe to clear all control pins.
 	bcm2835_gpio_clr_multi(CTRLPIN_MASK);
 
 	// clean up library.
 	if (!bcm2835_close()) {
-		fprintf(stderr, "Failed to clean up C library for Broadcom BCM 2835.\n");
+		fprintf(stderr, "Failed to clean up " SOCLIB ".\n");
 	}
 }
 
@@ -122,9 +145,29 @@ struct transmitter * transmitter_open(int id)
 		return NULL;
 	}
 
-	t->downpin = pin;
+	t->ctrlpin = pin;
 
 	return t;
+}
+
+const char * transmitter_utilization_set(struct transmitter *t, int util)
+{
+	uint8_t data[2];
+
+	if (util < 0 || util > 100) {
+		return "Invalid utilization value";
+	}
+
+	// setup data to transfer.
+	data[0] = 0x10 | 0x03;
+	data[1] = 0xFF * util / 100;
+
+	// transfer data.
+	bcm2835_gpio_clr(t->ctrlpin);
+	bcm2835_spi_writenb((char *)data, sizeof(data));
+	bcm2835_gpio_set(t->ctrlpin);
+
+	return NULL;
 }
 
 void transmitter_close(struct transmitter *t)

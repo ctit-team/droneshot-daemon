@@ -39,6 +39,15 @@ struct transmitter * transmitter_open(int id)
 	return t;
 }
 
+const char * transmitter_utilization_set(struct transmitter *t, int util)
+{
+	if (util < 0 || util > 100) {
+		return "Invalid utilization value";
+	}
+
+	return NULL;
+}
+
 void transmitter_close(struct transmitter *t)
 {
 	free(t);

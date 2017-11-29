@@ -17,4 +17,5 @@ bool hardware_interface_init(void);
 void hardware_interface_close(void);
 
 struct transmitter * transmitter_open(int id);
+const char * transmitter_utilization_set(struct transmitter *t, int util);
 void transmitter_close(struct transmitter *t);

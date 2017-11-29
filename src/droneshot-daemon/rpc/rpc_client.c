@@ -9,6 +9,7 @@
 bool rpc_client_parse(const void *data, size_t len)
 {
 	// TODO: parse client data.
+	return true;
 }
 
 void rpc_client_close(int fd)
