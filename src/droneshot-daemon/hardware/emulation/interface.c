@@ -10,6 +10,7 @@ struct transmitter {
 
 bool hardware_interface_init(void)
 {
+	return true;
 }
 
 void hardware_interface_close(void)

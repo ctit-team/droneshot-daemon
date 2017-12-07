@@ -1,143 +1,102 @@
+#include "uv.h"
 #include "hardware/interface.h"
 #include "hardware/transmitter_collection.h"
-#include "rpc/rpc_client.h"
 #include "rpc/rpc_server.h"
 
-#include <errno.h>
+#include <uv.h>
+
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include <poll.h>
-#include <unistd.h>
-#include <sys/socket.h>
-
-static bool terminating;
-
-static void interrupt_handler(int sig)
+static void cleanup_handle(uv_handle_t *handle)
 {
-	terminating = true;
+	const struct uv_type *t = handle->data;
+	if (!t) {
+		return;
+	}
+
+	t->cleanup(handle);
 }
 
-static bool setup_signal_handlers(void)
+static void force_close(uv_handle_t *handle, void *arg)
 {
-	struct sigaction sigact;
+	if (uv_is_closing(handle)) {
+		return;
+	}
 
-	memset(&sigact, 0, sizeof(sigact));
-	sigact.sa_handler = interrupt_handler;
-	sigact.sa_flags = SA_RESETHAND; // we want one-shot only.
+	uv_close(handle, cleanup_handle);
+}
 
-	if (sigaction(SIGINT, &sigact, NULL) == -1) {
-		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to install interrupt handler: %s.\n", reason);
+static void interrupt_handler(uv_signal_t *handle, int signum)
+{
+	uv_walk(handle->loop, force_close, NULL);
+}
+
+static bool listen_interrupt(uv_loop_t *uv, uv_signal_t *sig)
+{
+	int err;
+
+	// initialize handle.
+	err = uv_signal_init(uv, sig);
+	if (err < 0) {
+		fprintf(stderr, "Failed to initialize interrupt handle: %s.\n", uv_strerror(err));
+		return false;
+	}
+
+	sig->data = NULL;
+
+	// start watching signal.
+	err = uv_signal_start_oneshot(sig, interrupt_handler, SIGINT);
+	if (err < 0) {
+		fprintf(stderr, "Failed to listen for interrupt signal: %s.\n", uv_strerror(err));
+		uv_close((uv_handle_t *)sig, NULL);
 		return false;
 	}
 
 	return true;
 }
 
-static bool run_rpc_server(int server_fd)
+static bool run(void)
 {
-	struct pollfd fds[2];
-	int ui_fd;
+	bool res = true;
+	int err;
+	uv_loop_t uv;
+	uv_signal_t sig;
 
-	if (!setup_signal_handlers()) {
+	// initialize libuv.
+	err = uv_loop_init(&uv);
+	if (err < 0) {
+		fprintf(stderr, "Failed to initializes libuv: %s.\n", uv_strerror(err));
 		return false;
 	}
 
-	// watch server file descriptor.
-	memset(fds, 0, sizeof(fds));
+	if (!listen_interrupt(&uv, &sig)) {
+		res = false;
+		goto run;
+	}
 
-	fds[0].fd = server_fd;
-	fds[0].events = POLLIN;
+	if (!rpc_server_start(&uv)) {
+		res = false;
+		uv_close((uv_handle_t *)&sig, NULL);
+		goto run;
+	}
 
-	// wait for events.
-	ui_fd = -1;
+	// run libuv.
+	run:
 
-	for (; !terminating;) {
-		int nev, i;
-
-		nev = poll(fds, ui_fd != -1 ? 2 : 1, -1);
-		if (nev == -1) {
-			if (errno != EINTR) {
-				const char *reason = strerror(errno);
-				fprintf(stderr, "Failed to polling events: %s.\n", reason);
-				break;
-			}
-			continue;
-		}
-
-		// process events.
-		for (i = 0; nev > 0; i++) {
-			if (!fds[i].revents) {
-				continue;
-			}
-
-			if (fds[i].fd == server_fd) {
-				int fd = rpc_server_accept(server_fd);
-
-				if (fd != -1) {
-					if (ui_fd != -1) {
-						printf("Maximum connections is already reached, rejecting connection.\n");
-						rpc_client_close(fd);
-					} else {
-						memset(&fds[1], 0, sizeof(fds[1]));
-						fds[1].fd = fd;
-						fds[1].events = POLLIN;
-						ui_fd = fd;
-					}
-				}
-			} else if (fds[i].fd == ui_fd) {
-				char data[256];
-				ssize_t n;
-				const char *reason;
-
-				n = recv(ui_fd, data, sizeof(data), 0);
-
-				switch (n) {
-				case -1:
-					reason = strerror(errno);
-					fprintf(stderr, "Failed to read data from RPC client on file descriptor #%d: %s.\n", ui_fd, reason);
-					break;
-				case 0:
-					rpc_client_close(ui_fd);
-					memset(&fds[1], 0, sizeof(fds[1]));
-					ui_fd = -1;
-					break;
-				default:
-					rpc_client_parse(data, n);
-				}
-			} else {
-				fprintf(stderr, "Events occurred on an unknown file descriptor #%d.\n", fds[i].fd);
-			}
-
-			nev--;
-		}
+	err = uv_run(&uv, UV_RUN_DEFAULT);
+	if (err < 0) {
+		fprintf(stderr, "Failed to run libuv: %s.\n", uv_strerror(err));
+		res = false;
 	}
 
 	// clean up.
-	if (ui_fd != -1 && close(ui_fd) == -1) {
-		const char *reason = strerror(errno);
-		fprintf(stderr, "Failed to close a connection to RPC client: %s.\n", reason);
+	err = uv_loop_close(&uv);
+	if (err < 0) {
+		fprintf(stderr, "Failed to shutdown libuv: %s.\n", uv_strerror(err));
 	}
-
-	return true;
-}
-
-static bool start_rpc_server(void)
-{
-	bool res;
-	int server_fd;
-
-	server_fd = rpc_server_start();
-	if (server_fd == -1) {
-		return false;
-	}
-
-	res = run_rpc_server(server_fd);
-	rpc_server_stop(server_fd);
 
 	return res;
 }
@@ -166,7 +125,7 @@ int main(int argc, char *argv[])
 	int res = EXIT_FAILURE;
 
 	if (init_hardware()) {
-		if (start_rpc_server()) {
+		if (run()) {
 			res = EXIT_SUCCESS;
 		}
 

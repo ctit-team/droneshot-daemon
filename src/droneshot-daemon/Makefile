@@ -3,9 +3,9 @@
 # common variables
 
 OUTPUT = droneshot-daemon
-CPPFLAGS = -Wall
-LDFLAGS =
-LDLIBS = -lstdc++
+CPPFLAGS = -O3 -Wall -g
+LDFLAGS = `pkg-config --libs-only-L libuv`
+LDLIBS = `pkg-config --libs-only-l libuv`
 
 # sources
 

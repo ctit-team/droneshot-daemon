@@ -1,7 +1,7 @@
 #pragma once
 
+#include <uv.h>
+
 #include <stdbool.h>
 
-int rpc_server_start(void);
-int rpc_server_accept(int fd);
-void rpc_server_stop(int fd);
+bool rpc_server_start(uv_loop_t *uv);
