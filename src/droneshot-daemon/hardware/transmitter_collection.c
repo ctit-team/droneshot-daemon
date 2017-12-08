@@ -52,6 +52,20 @@ bool transmitter_collection_init(void)
 	return true;
 }
 
+struct transmitter * transmitter_collection_get(int id)
+{
+	int i;
+
+	for (i = 0; i < DESCRIPTOR_COUNT; i++) {
+		const struct transmitter_descriptor *desc = &descriptors[i];
+		if (desc->id == id) {
+			return *desc->interface;
+		}
+	}
+
+	return NULL;
+}
+
 void transmitter_collection_close(void)
 {
 	int i;

@@ -12,4 +12,5 @@ extern struct transmitter *transmitter_rc1;
 extern struct transmitter *transmitter_rc2;
 
 bool transmitter_collection_init(void);
+struct transmitter * transmitter_collection_get(int id);
 void transmitter_collection_close(void);
