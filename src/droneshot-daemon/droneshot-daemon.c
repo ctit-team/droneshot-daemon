@@ -77,7 +77,7 @@ static bool run(void)
 		goto run;
 	}
 
-	if (!rpc_server_start(&uv)) {
+	if (!rpc_server_start(&uv, "/tmp/droneshot")) {
 		res = false;
 		uv_close((uv_handle_t *)&sig, NULL);
 		goto run;

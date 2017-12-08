@@ -4,4 +4,4 @@
 
 #include <stdbool.h>
 
-bool rpc_server_start(uv_loop_t *uv);
+bool rpc_server_start(uv_loop_t *uv, const char *sock);

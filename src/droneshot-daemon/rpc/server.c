@@ -13,12 +13,12 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/un.h>
-
-#define SOCKET_NAME "/tmp/droneshot"
 
 struct rpc_server {
 	uv_pipe_t h; // must be the first member.
+	char *sock;
 };
 
 static void cleanup(uv_handle_t *handle);
@@ -31,11 +31,12 @@ static void cleanup(uv_handle_t *handle)
 {
 	struct rpc_server *s = (struct rpc_server *)handle;
 
-	if (unlink(SOCKET_NAME) == -1) {
+	if (unlink(s->sock) == -1) {
 		const char *r = strerror(errno);
-		fprintf(stderr, "Failed to remove %s: %s.\n", SOCKET_NAME, r);
+		fprintf(stderr, "Failed to remove %s: %s.\n", s->sock, r);
 	}
 
+	free(s->sock);
 	free(s);
 }
 
@@ -112,19 +113,19 @@ static void accept_connection(uv_stream_t *server, int status)
 	}
 }
 
-static bool start_server(uv_pipe_t *h)
+static bool start_server(struct rpc_server *s)
 {
 	int err;
 
 	// change socket permission to world writable.
-	err = uv_pipe_chmod(h, UV_WRITABLE | UV_READABLE);
-	if (err < 0) {
-		fprintf(stderr, "Failed to allow world writable to server socket: %s.\n", uv_strerror(err));
+	if (chmod(s->sock, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
+		const char *r = strerror(errno);
+		fprintf(stderr, "Failed to allow world writable to %s: %s.\n", s->sock, r);
 		return false;
 	}
 
 	// listen for connections
-	err = uv_listen((uv_stream_t *)h, 5, accept_connection);
+	err = uv_listen((uv_stream_t *)s, 5, accept_connection);
 	if (err < 0) {
 		fprintf(stderr, "Failed to listen for connection: %s.\n", uv_strerror(err));
 		return false;
@@ -133,7 +134,7 @@ static bool start_server(uv_pipe_t *h)
 	return true;
 }
 
-bool rpc_server_start(uv_loop_t *uv)
+bool rpc_server_start(uv_loop_t *uv, const char *sock)
 {
 	struct rpc_server *s;
 	int fd, err;
@@ -147,9 +148,17 @@ bool rpc_server_start(uv_loop_t *uv)
 
 	memset(s, 0, sizeof(s[0]));
 
+	s->sock = strdup(sock);
+	if (!s->sock) {
+		fprintf(stderr, "Insufficient memory for server data.\n");
+		free(s);
+		return false;
+	}
+
 	// create socket.
-	fd = create_socket(SOCKET_NAME);
+	fd = create_socket(s->sock);
 	if (fd == -1) {
+		free(s->sock);
 		free(s);
 		return false;
 	}
@@ -174,7 +183,7 @@ bool rpc_server_start(uv_loop_t *uv)
 	s->h.data = (void *)&type;
 
 	// start server.
-	if (!start_server(&s->h)) {
+	if (!start_server(s)) {
 		uv_close((uv_handle_t *)&s->h, cleanup);
 		return false;
 	}
