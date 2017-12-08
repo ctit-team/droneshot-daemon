@@ -1,5 +1,5 @@
-#include "rpc_client.h"
-#include "rpc_server.h"
+#include "client.h"
+#include "server.h"
 #include "../uv.h"
 
 #include <uv.h>

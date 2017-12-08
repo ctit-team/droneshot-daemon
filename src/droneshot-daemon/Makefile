@@ -12,9 +12,9 @@ LDLIBS = `pkg-config --libs-only-l libuv`
 SOURCES = droneshot-daemon.c \
           hardware/interface.c \
           hardware/transmitter_collection.c \
+          rpc/client.c \
           rpc/parser.c \
-          rpc/rpc_client.c \
-          rpc/rpc_server.c
+          rpc/server.c
 
 # phony rules
 

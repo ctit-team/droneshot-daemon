@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rpc_client.h"
+#include "client.h"
 
 #include <stdbool.h>
 #include <stddef.h>

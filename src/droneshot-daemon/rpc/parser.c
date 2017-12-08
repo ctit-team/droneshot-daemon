@@ -1,6 +1,6 @@
+#include "client.h"
 #include "messages.h"
 #include "parser.h"
-#include "rpc_client.h"
 #include "../hardware/transmitter_collection.h"
 
 #include <inttypes.h>

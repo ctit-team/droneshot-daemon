@@ -1,7 +1,7 @@
 #include "uv.h"
 #include "hardware/interface.h"
 #include "hardware/transmitter_collection.h"
-#include "rpc/rpc_server.h"
+#include "rpc/server.h"
 
 #include <uv.h>
 
