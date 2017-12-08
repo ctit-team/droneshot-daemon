@@ -150,12 +150,12 @@ struct transmitter * transmitter_open(int id)
 	return t;
 }
 
-const char * transmitter_utilization_set(struct transmitter *t, int util)
+enum utilization_result transmitter_utilization_set(struct transmitter *t, int util)
 {
 	uint8_t data[2];
 
 	if (util < 0 || util > 100) {
-		return "Invalid utilization value";
+		return utilization_invalid;
 	}
 
 	// setup data to transfer.
@@ -167,7 +167,7 @@ const char * transmitter_utilization_set(struct transmitter *t, int util)
 	bcm2835_spi_writenb((char *)data, sizeof(data));
 	bcm2835_gpio_set(t->ctrlpin);
 
-	return NULL;
+	return utilization_success;
 }
 
 void transmitter_close(struct transmitter *t)

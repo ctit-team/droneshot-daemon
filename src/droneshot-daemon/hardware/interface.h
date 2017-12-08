@@ -9,6 +9,11 @@
 #define TRANSMITTER_RC1		5
 #define TRANSMITTER_RC2		6
 
+enum utilization_result {
+	utilization_success,
+	utilization_invalid
+};
+
 struct transmitter;
 
 extern const char *transmitter_names[];
@@ -17,5 +22,5 @@ bool hardware_interface_init(void);
 void hardware_interface_close(void);
 
 struct transmitter * transmitter_open(int id);
-const char * transmitter_utilization_set(struct transmitter *t, int util);
+enum utilization_result transmitter_utilization_set(struct transmitter *t, int util);
 void transmitter_close(struct transmitter *t);

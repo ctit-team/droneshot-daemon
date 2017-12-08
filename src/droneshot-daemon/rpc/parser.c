@@ -22,6 +22,16 @@ static const struct parser parsers[] = {
 	}
 };
 
+static bool success(struct rpc_client *c, uint8_t method, const void *payload, size_t len)
+{
+	return rpc_client_send(c, method, RPC_SUCCESS, payload, len);
+}
+
+static bool internal_error(struct rpc_client *c, uint8_t method)
+{
+	return rpc_client_send(c, method, RPC_INTERNAL_ERROR, NULL, 0);
+}
+
 static bool invalid_argument(struct rpc_client *c, uint8_t method, const char *name)
 {
 	return rpc_client_send(c, method, RPC_INVALID_ARGUMENT, name, strlen(name) + 1);
@@ -38,9 +48,18 @@ static bool parse_set_transmitter_util(struct rpc_client *c, uint8_t method, con
 		return invalid_argument(c, method, "transmitter_id");
 	}
 
-	// TODO: adjust transmitter power.
+	// adjust transmitter power.
+	switch (transmitter_utilization_set(t, r->utilization)) {
+	case utilization_success:
+		break;
+	case utilization_invalid:
+		return invalid_argument(c, method, "utilization");
+	default:
+		fprintf(stderr, "transmitter_utilization_set() return unexpected result.\n");
+		return internal_error(c, method);
+	}
 
-	return true;
+	return success(c, method, NULL, 0);
 }
 
 bool rpc_parser_parse(struct rpc_client *c, const void *data, size_t len)
