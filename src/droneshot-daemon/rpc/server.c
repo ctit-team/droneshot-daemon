@@ -85,7 +85,7 @@ static int create_socket(const char *name)
 
 static void accept_connection(uv_stream_t *server, int status)
 {
-	uv_pipe_t client;
+	struct rpc_client *client;
 
 	// check waiting status.
 	if (status < 0) {
@@ -94,22 +94,14 @@ static void accept_connection(uv_stream_t *server, int status)
 	}
 
 	// accept incoming connection.
-	status = uv_pipe_init(server->loop, &client, true);
-	if (status < 0) {
-		fprintf(stderr, "Failed to initialize handle for RPC client: %s.\n", uv_strerror(status));
+	client = rpc_client_new(server->loop);
+	if (!client) {
 		return;
 	}
 
-	status = uv_accept(server, (uv_stream_t *)&client);
-	if (status < 0) {
-		fprintf(stderr, "Failed to accept a connection from RPC client: %s.\n", uv_strerror(status));
-		uv_close((uv_handle_t *)&client, NULL);
+	if (!rpc_client_start(client, server)) {
+		rpc_client_free(client);
 		return;
-	}
-
-	// start client.
-	if (!rpc_client_start(&client)) {
-		uv_close((uv_handle_t *)&client, NULL);
 	}
 }
 

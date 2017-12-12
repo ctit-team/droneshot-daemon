@@ -5,6 +5,7 @@
 
 #include <uv.h>
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,28 +77,53 @@ static void read_data(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	free(buf->base);
 }
 
-bool rpc_client_start(const uv_pipe_t *h)
+struct rpc_client * rpc_client_new(uv_loop_t *uv)
 {
 	struct rpc_client *c;
 	int err;
 
-	// setup data.
+	// allocate data.
 	c = malloc(sizeof(c[0]));
 	if (!c) {
 		fprintf(stderr, "Insufficient memory for a new RPC client.\n");
-		return false;
+		return NULL;
 	}
 
 	memset(c, 0, sizeof(c[0]));
-	memcpy(&c->h, h, sizeof(c->h));
+
+	// setup data.
+	err = uv_pipe_init(uv, &c->h, true);
+	if (err < 0) {
+		fprintf(stderr, "Failed to initialize handle for RPC client: %s.\n", uv_strerror(err));
+		free(c);
+		return NULL;
+	}
 
 	c->h.data = (void *)&type;
+
+	return c;
+}
+
+void rpc_client_free(struct rpc_client *c)
+{
+	uv_close((uv_handle_t *)c, cleanup);
+}
+
+bool rpc_client_start(struct rpc_client *c, uv_stream_t *s)
+{
+	int err;
+
+	// accept incoming connection.
+	err = uv_accept(s, (uv_stream_t *)c);
+	if (err < 0) {
+		fprintf(stderr, "Failed to accept a connection from RPC client: %s.\n", uv_strerror(err));
+		return false;
+	}
 
 	// start receiving data.
 	err = uv_read_start((uv_stream_t *)c, alloc_buf, read_data);
 	if (err < 0) {
 		fprintf(stderr, "Failed to start receiving data from RPC client: %s.\n", uv_strerror(err));
-		free(c);
 		return false;
 	}
 
