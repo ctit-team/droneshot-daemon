@@ -39,6 +39,7 @@
 
 struct transmitter {
 	uint8_t ctrlpin;
+	uint8_t pwrpin;
 };
 
 bool hardware_interface_init(void)
@@ -110,28 +111,34 @@ void hardware_interface_close(void)
 
 struct transmitter * transmitter_open(int id)
 {
-	uint8_t pin;
+	uint8_t ctl, pwr;
 	struct transmitter *t;
 
 	// select control pin.
 	switch (id) {
 	case TRANSMITTER_WIFI1:
-		pin = CTRLPIN_WIFI1;
+		ctl = CTRLPIN_WIFI1;
+		pwr = PWRPIN_WIFI1;
 		break;
 	case TRANSMITTER_WIFI2:
-		pin = CTRLPIN_WIFI2;
+		ctl = CTRLPIN_WIFI2;
+		pwr = PWRPIN_WIFI2;
 		break;
 	case TRANSMITTER_WIFI3:
-		pin = CTRLPIN_WIFI3;
+		ctl = CTRLPIN_WIFI3;
+		pwr = PWRPIN_WIFI3;
 		break;
 	case TRANSMITTER_GPS:
-		pin = CTRLPIN_GPS;
+		ctl = CTRLPIN_GPS;
+		pwr = PWRPIN_GPS;
 		break;
 	case TRANSMITTER_RC1:
-		pin = CTRLPIN_RC1;
+		ctl = CTRLPIN_RC1;
+		pwr = PWRPIN_RC1;
 		break;
 	case TRANSMITTER_RC2:
-		pin = CTRLPIN_RC2;
+		ctl = CTRLPIN_RC2;
+		pwr = PWRPIN_RC2;
 		break;
 	default:
 		fprintf(stderr, "Failed to open a connection to transmitter: Unknown transmitter identifier %d.\n", id);
@@ -145,7 +152,8 @@ struct transmitter * transmitter_open(int id)
 		return NULL;
 	}
 
-	t->ctrlpin = pin;
+	t->ctrlpin = ctl;
+	t->pwrpin = pwr;
 
 	return t;
 }
@@ -158,14 +166,24 @@ enum utilization_result transmitter_utilization_set(struct transmitter *t, int u
 		return utilization_invalid;
 	}
 
-	// setup data to transfer.
+	// adjust utilization.
 	data[0] = 0x10 | 0x03;
 	data[1] = 0xFF * util / 100;
 
-	// transfer data.
 	bcm2835_gpio_clr(t->ctrlpin);
 	bcm2835_spi_writenb((char *)data, sizeof(data));
 	bcm2835_gpio_set(t->ctrlpin);
+
+	// toggle master switch.
+	if (util) {
+		if (bcm2835_gpio_lev(t->pwrpin) != HIGH) {
+			bcm2835_gpio_set(t->pwrpin);
+		}
+	} else {
+		if (bcm2835_gpio_lev(t->pwrpin) != LOW) {
+			bcm2835_gpio_clr(t->pwrpin);
+		}
+	}
 
 	return utilization_success;
 }
