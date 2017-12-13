@@ -1,5 +1,5 @@
 [Unit]
-Description=System services for Drone Shot
+Description=Drone Shot system
 
 [Install]
 WantedBy=multi-user.target
