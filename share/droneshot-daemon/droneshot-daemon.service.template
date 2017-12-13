@@ -1,3 +1,9 @@
+[Unit]
+Description=System services for Drone Shot
+
+[Install]
+WantedBy=multi-user.target
+
 [Service]
 Type=notify
 ExecStart=PATH_TO_EXE
