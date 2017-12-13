@@ -21,10 +21,8 @@ struct rpc_server {
 	char *sock;
 };
 
-static void cleanup(uv_handle_t *handle);
-
 static const struct uv_type type = {
-	.cleanup = cleanup
+	.destroy = (uv_destroy_t)rpc_server_free
 };
 
 static void cleanup(uv_handle_t *handle)

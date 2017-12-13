@@ -15,23 +15,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void cleanup_handle(uv_handle_t *handle)
-{
-	const struct uv_type *t = handle->data;
-	if (!t) {
-		return;
-	}
-
-	t->cleanup(handle);
-}
-
 static void force_close(uv_handle_t *handle, void *arg)
 {
+	const struct uv_type *t;
+
 	if (uv_is_closing(handle)) {
 		return;
 	}
 
-	uv_close(handle, cleanup_handle);
+	t = (const struct uv_type *)handle->data;
+	if (t && t->destroy) {
+		t->destroy(handle);
+	} else {
+		uv_close(handle, NULL);
+	}
 }
 
 static void interrupt_handler(uv_signal_t *handle, int signum)

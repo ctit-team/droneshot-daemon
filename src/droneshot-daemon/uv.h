@@ -2,6 +2,8 @@
 
 #include <uv.h>
 
+typedef void (*uv_destroy_t) (uv_handle_t *h);
+
 struct uv_type {
-	uv_close_cb cleanup;
+	uv_destroy_t destroy;
 };

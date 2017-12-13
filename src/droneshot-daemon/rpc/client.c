@@ -19,10 +19,8 @@ struct write_request {
 	uv_buf_t buf;
 };
 
-static void cleanup(uv_handle_t *handle);
-
 static const struct uv_type type = {
-	.cleanup = cleanup
+	.destroy = (uv_destroy_t)rpc_client_free
 };
 
 static void cleanup(uv_handle_t *handle)
