@@ -5,10 +5,15 @@
 
 #include <uv.h>
 
+#ifdef DRONESHOT_SYSTEMD_SERVICE
+#include <systemd/sd-daemon.h>
+#endif
+
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void cleanup_handle(uv_handle_t *handle)
 {
@@ -64,6 +69,7 @@ static bool run(void)
 	int err;
 	uv_loop_t uv;
 	uv_signal_t sig;
+	struct rpc_server *s;
 
 	// initialize libuv.
 	err = uv_loop_init(&uv);
@@ -72,16 +78,30 @@ static bool run(void)
 		return false;
 	}
 
+	// listen for interrupt signal
 	if (!listen_interrupt(&uv, &sig)) {
 		res = false;
 		goto run;
 	}
 
-	if (!rpc_server_start(&uv, "/tmp/droneshot")) {
-		res = false;
-		uv_close((uv_handle_t *)&sig, NULL);
-		goto run;
+	// start RPC server.
+	s = rpc_server_new(&uv, "/tmp/droneshot");
+	if (!s) {
+		goto fail_with_signal;
 	}
+
+	if (!rpc_server_start(s)) {
+		goto fail_with_server;
+	}
+
+#ifdef DRONESHOT_SYSTEMD_SERVICE
+	// notify systemd that we are ready.
+	err = sd_notify(false, "READY=1");
+	if (err < 0) {
+		fprintf(stderr, "Failed to notify systemd that we are ready: %s.\n", strerror(-err));
+		goto fail_with_server;
+	}
+#endif
 
 	// run libuv.
 	run:
@@ -99,6 +119,16 @@ static bool run(void)
 	}
 
 	return res;
+
+	// error handlers.
+	fail_with_server:
+	rpc_server_free(s);
+
+	fail_with_signal:
+	uv_close((uv_handle_t *)&sig, NULL);
+
+	res = false;
+	goto run;
 }
 
 static bool init_hardware(void)

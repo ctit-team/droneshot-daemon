@@ -31,7 +31,7 @@ static void cleanup(uv_handle_t *handle)
 {
 	struct rpc_server *s = (struct rpc_server *)handle;
 
-	if (unlink(s->sock) == -1) {
+	if (unlink(s->sock) == -1 && errno != ENOENT) {
 		const char *r = strerror(errno);
 		fprintf(stderr, "Failed to remove %s: %s.\n", s->sock, r);
 	}
@@ -126,59 +126,64 @@ static bool start_server(struct rpc_server *s)
 	return true;
 }
 
-bool rpc_server_start(uv_loop_t *uv, const char *sock)
+struct rpc_server * rpc_server_new(uv_loop_t *uv, const char *sock)
 {
 	struct rpc_server *s;
-	int fd, err;
+	int err;
 
 	// allocate data.
 	s = malloc(sizeof(s[0]));
 	if (!s) {
 		fprintf(stderr, "Insufficient memory for server data.\n");
-		return false;
+		return NULL;
 	}
 
 	memset(s, 0, sizeof(s[0]));
 
+	// initialize data.
 	s->sock = strdup(sock);
 	if (!s->sock) {
-		fprintf(stderr, "Insufficient memory for server data.\n");
+		fprintf(stderr, "Insufficient memory for server socket name.\n");
 		free(s);
-		return false;
+		return NULL;
 	}
 
-	// create socket.
-	fd = create_socket(s->sock);
-	if (fd == -1) {
-		free(s->sock);
-		free(s);
-		return false;
-	}
-
-	// initialize handle.
-	err = uv_pipe_init(uv, &s->h, true);
+	err = uv_pipe_init(uv, (uv_pipe_t *)s, true);
 	if (err < 0) {
 		fprintf(stderr, "Failed to initialize server handle: %s.\n", uv_strerror(err));
-		close_socket(fd);
-		cleanup((uv_handle_t *)s);
-		return false;
-	}
-
-	err = uv_pipe_open(&s->h, fd);
-	if (err < 0) {
-		fprintf(stderr, "Failed to associate server descriptor to handle: %s.\n", uv_strerror(err));
-		close_socket(fd);
-		uv_close((uv_handle_t *)&s->h, cleanup);
-		return false;
+		free(s->sock);
+		free(s);
+		return NULL;
 	}
 
 	s->h.data = (void *)&type;
 
-	// start server.
-	if (!start_server(s)) {
-		uv_close((uv_handle_t *)&s->h, cleanup);
+	return s;
+}
+
+void rpc_server_free(struct rpc_server *s)
+{
+	uv_close((uv_handle_t *)s, cleanup);
+}
+
+bool rpc_server_start(struct rpc_server *s)
+{
+	int fd, err;
+
+	// create socket.
+	fd = create_socket(s->sock);
+	if (fd == -1) {
 		return false;
 	}
 
-	return true;
+	// initialize handle.
+	err = uv_pipe_open((uv_pipe_t *)s, fd);
+	if (err < 0) {
+		fprintf(stderr, "Failed to associate server descriptor to handle: %s.\n", uv_strerror(err));
+		close_socket(fd);
+		return false;
+	}
+
+	// start server.
+	return start_server(s);
 }

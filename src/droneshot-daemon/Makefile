@@ -4,8 +4,13 @@
 
 OUTPUT = droneshot-daemon
 CPPFLAGS = -O3 -Wall -g
-LDFLAGS = `pkg-config --libs-only-L libuv`
+LDFLAGS =
 LDLIBS = `pkg-config --libs-only-l libuv`
+
+ifeq ($(TYPE), systemd)
+CPPFLAGS += -DDRONESHOT_SYSTEMD_SERVICE
+LDLIBS += `pkg-config --libs-only-l libsystemd`
+endif
 
 # sources
 
