@@ -1,5 +1,5 @@
 [Unit]
-Description=Drone Shot system
+Description=Drone Shot System
 
 [Install]
 WantedBy=multi-user.target
