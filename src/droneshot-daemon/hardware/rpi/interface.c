@@ -37,6 +37,8 @@
 						 (1 << PWRPIN_RC1) | \
 						 (1 << PWRPIN_RC2))
 
+#define value_from_percent(m, p) ((m) * (p) / 100)
+
 struct transmitter {
 	uint8_t ctrlpin;
 	uint8_t pwrpin;
@@ -160,6 +162,7 @@ struct transmitter * transmitter_open(int id)
 
 enum utilization_result transmitter_utilization_set(struct transmitter *t, int util)
 {
+	const uint8_t start = value_from_percent(0xFF, 80);
 	uint8_t data[2];
 
 	if (util < 0 || util > 100) {
@@ -168,7 +171,7 @@ enum utilization_result transmitter_utilization_set(struct transmitter *t, int u
 
 	// adjust utilization.
 	data[0] = 0x10 | 0x03;
-	data[1] = 0xFF * util / 100;
+	data[1] = value_from_percent(0xFF - start, util);
 
 	bcm2835_gpio_clr(t->ctrlpin);
 	bcm2835_spi_writenb((char *)data, sizeof(data));
