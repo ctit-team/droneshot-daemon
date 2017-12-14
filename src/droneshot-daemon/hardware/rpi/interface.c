@@ -171,7 +171,7 @@ enum utilization_result transmitter_utilization_set(struct transmitter *t, int u
 
 	// adjust utilization.
 	data[0] = 0x10 | 0x03;
-	data[1] = value_from_percent(0xFF - start, util);
+	data[1] = start + value_from_percent(0xFF - start, util);
 
 	bcm2835_gpio_clr(t->ctrlpin);
 	bcm2835_spi_writenb((char *)data, sizeof(data));
