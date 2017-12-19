@@ -19,7 +19,9 @@ SOURCES = droneshot-daemon.c \
           hardware/transmitter_collection.c \
           rpc/client.c \
           rpc/parser.c \
-          rpc/server.c
+          rpc/server.c \
+          setting/main.c \
+          setting/parser.c
 
 # phony rules
 

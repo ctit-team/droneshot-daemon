@@ -1,6 +1,7 @@
 #include "uv.h"
 #include "hardware/interface.h"
 #include "hardware/transmitter_collection.h"
+#include "setting/main.h"
 #include "rpc/server.h"
 
 #include <uv.h>
@@ -147,9 +148,28 @@ static void close_hardware()
 	hardware_interface_close();
 }
 
+static bool init_settings(void)
+{
+	if (!setting_main_init()) {
+		return false;
+	}
+
+	return true;
+}
+
+static void term_settings(void)
+{
+}
+
 int main(int argc, char *argv[])
 {
-	int res = EXIT_FAILURE;
+	int res;
+
+	if (!init_settings()) {
+		return EXIT_FAILURE;
+	}
+
+	res = EXIT_FAILURE;
 
 	if (init_hardware()) {
 		if (run()) {
@@ -158,6 +178,8 @@ int main(int argc, char *argv[])
 
 		close_hardware();
 	}
+
+	term_settings();
 
 	return res;
 }
