@@ -15,14 +15,14 @@
 #define value_from_percent(m, p) ((m) * (p) / 100)
 
 struct transmitter {
-	uint8_t ctrlpin;
-	uint8_t pwrpin;
+	int id;
 };
 
 bool hardware_interface_init(void)
 {
 	const struct setting_main *s;
 	uint32_t pins, states;
+	int i;
 
 	if (!bcm2835_init()) {
 		return false;
@@ -44,30 +44,19 @@ bool hardware_interface_init(void)
 	// set all control/power pins to output mode.
 	s = setting_main_current();
 
-	bcm2835_gpio_fsel(s->transmitter1_control_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter2_control_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter3_control_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter4_control_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter5_control_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter6_control_pin, BCM2835_GPIO_FSEL_OUTP);
-
-	bcm2835_gpio_fsel(s->transmitter1_power_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter2_power_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter3_power_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter4_power_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter5_power_pin, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(s->transmitter6_power_pin, BCM2835_GPIO_FSEL_OUTP);
+	for (i = 0; i < MAX_TRANSMITTER; i++) {
+		bcm2835_gpio_fsel(s->transmitters[i].ctlpin, BCM2835_GPIO_FSEL_OUTP);
+		bcm2835_gpio_fsel(s->transmitters[i].pwrpin, BCM2835_GPIO_FSEL_OUTP);
+	}
 
 	// set all control pins and clear all power pins.
-	pins   = bit(s->transmitter1_control_pin) | bit(s->transmitter2_control_pin)
-		   | bit(s->transmitter3_control_pin) | bit(s->transmitter4_control_pin)
-		   | bit(s->transmitter5_control_pin) | bit(s->transmitter6_control_pin)
-		   | bit(s->transmitter1_power_pin) | bit(s->transmitter2_power_pin)
-		   | bit(s->transmitter3_power_pin) | bit(s->transmitter4_power_pin)
-		   | bit(s->transmitter5_power_pin) | bit(s->transmitter6_power_pin);
-	states = bit(s->transmitter1_control_pin) | bit(s->transmitter2_control_pin)
-		   | bit(s->transmitter3_control_pin) | bit(s->transmitter4_control_pin)
-		   | bit(s->transmitter5_control_pin) | bit(s->transmitter6_control_pin);
+	pins = 0;
+	states = 0;
+
+	for (i = 0; i < MAX_TRANSMITTER; i++) {
+		pins |= bit(s->transmitters[i].ctlpin) | bit(s->transmitters[i].pwrpin);
+		states |= bit(s->transmitters[i].ctlpin);
+	}
 
 	bcm2835_gpio_write_mask(states, pins);
 
@@ -87,12 +76,15 @@ void hardware_interface_close(void)
 {
 	const struct setting_main *s = setting_main_current();
 	uint32_t pins;
+	int i;
 
 	// turn off transmitters first to prevent unexpected behavior when clearing
 	// control pins.
-	pins = bit(s->transmitter1_power_pin) | bit(s->transmitter2_power_pin)
-		 | bit(s->transmitter3_power_pin) | bit(s->transmitter4_power_pin)
-		 | bit(s->transmitter5_power_pin) | bit(s->transmitter6_power_pin);
+	pins = 0;
+
+	for (i = 0; i < MAX_TRANSMITTER; i++) {
+		pins |= bit(s->transmitters[i].pwrpin);
+	}
 
 	bcm2835_gpio_clr_multi(pins);
 
@@ -101,9 +93,11 @@ void hardware_interface_close(void)
 	bcm2835_spi_end();
 
 	// now it safe to clear all control pins.
-	pins = bit(s->transmitter1_control_pin) | bit(s->transmitter2_control_pin)
-		 | bit(s->transmitter3_control_pin) | bit(s->transmitter4_control_pin)
-		 | bit(s->transmitter5_control_pin) | bit(s->transmitter6_control_pin);
+	pins = 0;
+
+	for (i = 0; i < MAX_TRANSMITTER; i++) {
+		pins |= bit(s->transmitters[i].ctlpin);
+	}
 
 	bcm2835_gpio_clr_multi(pins);
 
@@ -115,58 +109,29 @@ void hardware_interface_close(void)
 
 struct transmitter * transmitter_open(int id)
 {
-	const struct setting_main *s = setting_main_current();
-	uint8_t ctl, pwr;
 	struct transmitter *t;
 
-	// select control pin.
-	switch (id) {
-	case TRANSMITTER_WIFI1:
-		ctl = s->transmitter1_control_pin;
-		pwr = s->transmitter1_power_pin;
-		break;
-	case TRANSMITTER_WIFI2:
-		ctl = s->transmitter2_control_pin;
-		pwr = s->transmitter2_power_pin;
-		break;
-	case TRANSMITTER_WIFI3:
-		ctl = s->transmitter3_control_pin;
-		pwr = s->transmitter3_power_pin;
-		break;
-	case TRANSMITTER_GPS:
-		ctl = s->transmitter4_control_pin;
-		pwr = s->transmitter4_power_pin;
-		break;
-	case TRANSMITTER_RC1:
-		ctl = s->transmitter5_control_pin;
-		pwr = s->transmitter5_power_pin;
-		break;
-	case TRANSMITTER_RC2:
-		ctl = s->transmitter6_control_pin;
-		pwr = s->transmitter6_power_pin;
-		break;
-	default:
+	if (id <= 0 || id > MAX_TRANSMITTER) {
 		fprintf(stderr, "Failed to open a connection to transmitter: Unknown transmitter identifier %d.\n", id);
 		return NULL;
 	}
 
-	// create transmitter interface.
+	// setup transmitter specific data.
 	t = malloc(sizeof(t[0]));
 	if (!t) {
-		fprintf(stderr, "Failed to open a connection to %s transmitter: Insufficient memory.\n", transmitter_names[id]);
+		fprintf(stderr, "Failed to open a connection to transmitter %d: Insufficient memory.\n", id);
 		return NULL;
 	}
 
 	memset(t, 0, sizeof(t[0]));
-	t->ctrlpin = ctl;
-	t->pwrpin = pwr;
+	t->id = id;
 
 	return t;
 }
 
 enum utilization_result transmitter_utilization_set(struct transmitter *t, int util)
 {
-	const uint8_t start = value_from_percent(0xFF, 80);
+	const struct transmitter_settings *s;
 	uint8_t data[2];
 
 	if (util < 0 || util > 100) {
@@ -174,21 +139,23 @@ enum utilization_result transmitter_utilization_set(struct transmitter *t, int u
 	}
 
 	// adjust utilization.
-	data[0] = 0x10 | 0x03;
-	data[1] = start + value_from_percent(0xFF - start, util);
+	s = &setting_main_current()->transmitters[t->id - 1];
 
-	bcm2835_gpio_clr(t->ctrlpin);
+	data[0] = 0x10 | 0x03;
+	data[1] = s->start + value_from_percent(s->end - s->start, util);
+
+	bcm2835_gpio_clr(s->ctlpin);
 	bcm2835_spi_writenb((char *)data, sizeof(data));
-	bcm2835_gpio_set(t->ctrlpin);
+	bcm2835_gpio_set(s->ctlpin);
 
 	// toggle master switch.
 	if (util) {
-		if (bcm2835_gpio_lev(t->pwrpin) != HIGH) {
-			bcm2835_gpio_set(t->pwrpin);
+		if (bcm2835_gpio_lev(s->pwrpin) != HIGH) {
+			bcm2835_gpio_set(s->pwrpin);
 		}
 	} else {
-		if (bcm2835_gpio_lev(t->pwrpin) != LOW) {
-			bcm2835_gpio_clr(t->pwrpin);
+		if (bcm2835_gpio_lev(s->pwrpin) != LOW) {
+			bcm2835_gpio_clr(s->pwrpin);
 		}
 	}
 

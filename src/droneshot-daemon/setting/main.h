@@ -3,24 +3,17 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#define MAX_TRANSMITTER 6
+
+struct transmitter_settings {
+	uint8_t ctlpin;
+	uint8_t pwrpin;
+	uint8_t start;
+	uint8_t end;
+};
+
 struct setting_main {
-	uint8_t transmitter1_control_pin;
-	uint8_t transmitter1_power_pin;
-
-	uint8_t transmitter2_control_pin;
-	uint8_t transmitter2_power_pin;
-
-	uint8_t transmitter3_control_pin;
-	uint8_t transmitter3_power_pin;
-
-	uint8_t transmitter4_control_pin;
-	uint8_t transmitter4_power_pin;
-
-	uint8_t transmitter5_control_pin;
-	uint8_t transmitter5_power_pin;
-
-	uint8_t transmitter6_control_pin;
-	uint8_t transmitter6_power_pin;
+	struct transmitter_settings transmitters[MAX_TRANSMITTER];
 };
 
 bool setting_main_init(void);
