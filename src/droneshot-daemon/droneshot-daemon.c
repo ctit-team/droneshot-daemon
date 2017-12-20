@@ -1,3 +1,5 @@
+#include "argument.h"
+#include "logging.h"
 #include "uv.h"
 #include "hardware/interface.h"
 #include "hardware/transmitter_collection.h"
@@ -163,23 +165,50 @@ static void term_settings(void)
 
 int main(int argc, char *argv[])
 {
-	int res;
+	int res = EXIT_FAILURE;
 
+	// parse arguments.
+	switch (argument_init(argc, argv)) {
+	case argument_init_ok:
+		break;
+	case argument_init_shown_help:
+		res = EXIT_SUCCESS;
+	default:
+		goto done;
+	}
+
+	// initialize logging.
+	if (!logging_init()) {
+		goto done_with_argument;
+	}
+
+	// load settings.
 	if (!init_settings()) {
-		return EXIT_FAILURE;
+		goto done_with_logging;
 	}
 
-	res = EXIT_FAILURE;
-
-	if (init_hardware()) {
-		if (run()) {
-			res = EXIT_SUCCESS;
-		}
-
-		close_hardware();
+	// initialize hardware communication.
+	if (!init_hardware()) {
+		goto done_with_settings;
 	}
 
+	// enter main loop.
+	if (run()) {
+		res = EXIT_SUCCESS;
+	}
+
+	// clean up.
+	close_hardware();
+
+	done_with_settings:
 	term_settings();
 
+	done_with_logging:
+	logging_term();
+
+	done_with_argument:
+	argument_term();
+
+	done:
 	return res;
 }

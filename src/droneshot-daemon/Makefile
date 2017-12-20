@@ -23,7 +23,9 @@ endif
 
 # sources
 
-SOURCES = droneshot-daemon.c \
+SOURCES = argument.c \
+          droneshot-daemon.c \
+          logging.c \
           hardware/transmitter_collection.c \
           rpc/client.c \
           rpc/parser.c \
