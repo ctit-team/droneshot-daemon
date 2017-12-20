@@ -15,7 +15,6 @@ endif
 # sources
 
 SOURCES = droneshot-daemon.c \
-          hardware/interface.c \
           hardware/transmitter_collection.c \
           rpc/client.c \
           rpc/parser.c \

@@ -16,8 +16,6 @@ enum utilization_result {
 
 struct transmitter;
 
-extern const char *transmitter_names[];
-
 bool hardware_interface_init(void);
 void hardware_interface_close(void);
 

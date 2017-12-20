@@ -31,7 +31,7 @@ struct transmitter * transmitter_open(int id)
 	// create transmitter interface.
 	t = calloc(1, sizeof(struct transmitter));
 	if (!t) {
-		fprintf(stderr, "Failed to open a connection to %s transmitter: Insufficient memory.\n", transmitter_names[id]);
+		fprintf(stderr, "Failed to open a connection to transmitter %d: Insufficient memory.\n", id);
 		return NULL;
 	}
 
