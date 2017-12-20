@@ -1,4 +1,5 @@
 #include "../interface.h"
+#include "../../logging.h"
 #include "../../setting/main.h"
 
 #include <bcm2835.h>
@@ -145,7 +146,10 @@ enum utilization_result transmitter_utilization_set(struct transmitter *t, int u
 	data[1] = s->start + value_from_percent(s->end - s->start, util);
 
 	bcm2835_gpio_clr(s->ctlpin);
+
+	logging_write(logging_hardware, "Transmitting SPI data: %s.\n", logging_printable_raw(data, sizeof(data)));
 	bcm2835_spi_writenb((char *)data, sizeof(data));
+
 	bcm2835_gpio_set(s->ctlpin);
 
 	// toggle master switch.
